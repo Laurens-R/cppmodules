@@ -223,3 +223,131 @@ export {
 }
 
 ```
+
+## 6. Some tricks for dealing with conditional compilation
+
+In my code base I had some debugging code that I wanted to expose through a module. When using a tradition approach I could
+simply define a macro which would call a function when building in DEBUG mode, but would resolve into nothing when building
+in RELEASE mode. However, as mentioned before, modules don't support macros. So how do you deal with this? Well, used an empty
+consteval function to act as an empty placeholder for the function call in RELEASE mode. As these are evaluated at compile time,
+it results in the function call being removed from the code.
+
+It is good to know that you can still use macros in the module interface files themselves to deal with conditional compilation. So the
+following worked very well for me (not sure if it is the best way to do it, but it works):
+
+```cpp
+
+``cpp
+
+module;
+
+#include "myclass.h"
+
+export module MyModule;
+
+export {
+    namespace MyNamespace {
+        #ifdef _DEBUG
+            export void DebugFunction() {
+                // Do something
+            }
+        #else
+            export consteval void DebugFunction() { } //Do nothing
+        #endif
+    }
+}
+
+```
+
+## 6. Using modules
+
+Using modules is relatively straightforward. You simply import them and use them. The only thing you would want to keep in mind is to include
+any traditional header files before the module import statement. This is because the pre-processor is still used to process the traditional header
+files and the compiler needs to know about them before it can process the module import statement. So the following would work
+
+
+```cpp
+
+//I usually tend to include STL headers first for consistency and it seems to matter sometimes
+#include <vector>
+
+//then I include my own headers or other third party headers
+#include "myclass.h"
+
+import MyModule;
+
+namespace MyNamespace {
+    class OtherClass {
+        // Use your stuff here
+    };
+}
+
+```
+
+## 6.5 Using modules - the quirks
+
+Ok, so all great stuff. But I've encountered some quirks which I'm not sure if they are bugs or if I'm doing something wrong. But you
+are probably likely to encounter them as well, so I'll mention them here.
+
+- The order in which you are importing/including things matter. If you are not careful, you get weird errors about not being able to resolve
+symbols. Or you run into a situation where the compiler stars complaining about re-definition of symbols from the STL. It can be
+maddening at times to figure out.
+- As an extension to my previous point; it sometimes appears as if your regular include guards don't work anymore. I'm not sure
+if that is actually the case or if it is a side effect of something else. My compiler will freak out about re-definition of symbols
+from time to time, which I'm able to fix by re-ordering my includes. It makes me feel uncomfortable though, as I'm not sure what
+is actually the cause of it - and I don't like that.
+
+for example, this won't work:
+
+```cpp
+
+#include "class1.h"
+#include "class2.h"
+#include "class3.h"
+#include "class4.h" //ARGH! Panic about re-defining stuff, although there are include guards everywhere!
+
+import MyModule;
+
+namespace MyNamespace {
+    // Stuff
+}
+
+```
+
+But this does work:
+
+```cpp
+
+#include "class4.h" //This is fine now - BUT WHY?!
+#include "class1.h"
+#include "class2.h"
+#include "class3.h"
+
+import MyModule;
+
+namespace MyNamespace {
+    // Stuff
+}
+
+```
+
+I also ran into issues when including files beyond the module import statements. (This could be due to how the pre-processor processes these things) For example:
+
+```cpp
+
+#include "class1.h"
+#include "class2.h"
+#include "class3.h"
+
+import MyModule;
+
+#include "class4.h" //ARGH! Panic about re-defining stuff, although there are include guards everywhere!
+
+#include <vector> //Even more issues!
+
+namespace MyNamespace {
+// Stuff
+}
+
+```
+
