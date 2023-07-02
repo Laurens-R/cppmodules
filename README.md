@@ -351,3 +351,33 @@ namespace MyNamespace {
 
 ```
 
+## 7. Templates!
+
+Some of the things to keep in mind when exposing templated classes through modules:
+
+- When exporting a templated class which is located in another .h file, you can simply use a using statement like any other class.
+- if you want to include the templated class inside your module interface file, you need to use the export keyword in front of the template.
+
+```cpp
+
+module;
+
+#include "mytemplatedclass.h"
+
+
+export module MyModule;
+
+export {
+    namespace MyNamespace {
+       using MyNamespace::MyTemplatedClass;
+       
+       //OR
+       
+       export template<typename T>
+       class MyTemplatedClass2 {
+           // Stuff
+       };
+    }
+}
+
+```
